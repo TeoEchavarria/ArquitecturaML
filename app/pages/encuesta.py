@@ -3,6 +3,7 @@ import numpy as np
 import json
 import os
 from context.arquitectura_data import PREGUNTAS_ARQUITECTURA, INTERPRETACION_DIFUSA
+from utils.evaluacion_helper import procesar_respuestas, generar_interpretacion_textual
 
 def app():
     st.title("Evaluación de Arquitectura de Software")
@@ -105,60 +106,26 @@ def app():
     # Botón para finalizar encuesta
     if st.session_state.pagina_actual == total_categorias - 1:
         if st.button("Finalizar Encuesta y Ver Resultados"):
-            # Guardar las respuestas en la sesión para usarlas en la página de resultados
-            # Se podrían almacenar en un archivo JSON también
+            # Indicar que la encuesta está completada
             st.session_state.encuesta_completada = True
             
-            # Redireccionar a la página de resultados o mostrar aquí mismo
+            # Mostrar mensaje de éxito
             st.success("¡Encuesta completada! Procesando resultados...")
             
-            # Calcular las puntuaciones por categoría
-            calcular_resultados()
+            # Calcular y guardar los resultados utilizando el helper
+            resultados = procesar_respuestas(st.session_state.respuestas)
+            st.session_state.resultados_encuesta = resultados
             
-            # Redireccionar a la página de chat con los resultados
-            # En una implementación real, redireccionaríamos al chat
+            # Generar interpretación preliminar
+            interpretacion = generar_interpretacion_textual(resultados)
+            st.session_state.interpretacion_preliminar = interpretacion
+            
+            # Informar al usuario que será redirigido
             st.info("A continuación, serás redirigido al chat de asesoría...")
-
-def calcular_resultados():
-    """Calcula los resultados de la encuesta y los guarda en la sesión"""
-    resultados = {}
-    
-    # Agrupar por categorías
-    for categoria in PREGUNTAS_ARQUITECTURA:
-        nombre_categoria = categoria['categoria']
-        resultados[nombre_categoria] = {
-            "puntuacion_ponderada": 0,
-            "total_preguntas": 0,
-            "respuestas": []
-        }
-    
-    # Procesar las respuestas
-    for id_pregunta, respuesta in st.session_state.respuestas.items():
-        categoria = respuesta['categoria']
-        valor = respuesta['valor']
-        peso = respuesta['peso']
-        
-        resultados[categoria]["puntuacion_ponderada"] += valor * peso
-        resultados[categoria]["total_preguntas"] += 1
-        resultados[categoria]["respuestas"].append({
-            "id": id_pregunta,
-            "valor": valor,
-            "peso": peso
-        })
-    
-    # Calcular el promedio ponderado para cada categoría
-    for categoria in resultados:
-        if resultados[categoria]["total_preguntas"] > 0:
-            resultados[categoria]["promedio"] = resultados[categoria]["puntuacion_ponderada"] / resultados[categoria]["total_preguntas"]
-        else:
-            resultados[categoria]["promedio"] = 0
-    
-    # Guardar los resultados en la sesión
-    st.session_state.resultados_encuesta = resultados
-    
-    # También podríamos guardar en un archivo para persistencia
-    # with open("resultados_encuesta.json", "w") as f:
-    #     json.dump(resultados, f)
+            
+            # Cambiar a la página de chat
+            st.session_state.page = "chat"
+            st.experimental_rerun()
 
 if __name__ == "__main__":
     app()

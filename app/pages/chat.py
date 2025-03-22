@@ -2,6 +2,8 @@ import streamlit as st
 import json
 import os
 from utils.openai_helper import get_openai_response
+import matplotlib.pyplot as plt
+import numpy as np
 
 def app():
     st.title("Chat de Asesoría Arquitectónica")
@@ -18,7 +20,7 @@ def app():
     resultados = st.session_state.resultados_encuesta
     
     # Crear un gráfico de resumen por categoría
-    categorias = list(resultados.keys())
+    categorias = [cat for cat in resultados.keys() if cat not in ["puntuaciones_globales", "recomendacion"]]
     promedios = [resultados[cat]["promedio"] for cat in categorias]
     
     # Mostrar promedios por categoría
@@ -45,19 +47,48 @@ def app():
             delta=f"{'+' if promedios[2] > 0.5 else ''}{(promedios[2] - 0.5):.2f}"
         )
     
+    # Mostrar puntuaciones globales en una gráfica
+    st.subheader("Puntuaciones por Arquitectura")
+    
+    # Extraer puntuaciones para cada arquitectura
+    puntuaciones = resultados["puntuaciones_globales"]
+    arquitecturas = list(puntuaciones.keys())
+    valores = list(puntuaciones.values())
+    
+    # Crear gráfico de barras horizontal
+    fig, ax = plt.subplots(figsize=(10, 5))
+    bars = ax.barh(arquitecturas, valores, color=['#3498db', '#2ecc71', '#e74c3c', '#f39c12'])
+    
+    # Añadir etiquetas a las barras
+    for i, bar in enumerate(bars):
+        width = bar.get_width()
+        ax.text(width + 0.01, bar.get_y() + bar.get_height()/2, 
+                f'{width:.2f}', ha='left', va='center')
+    
+    # Configuración del gráfico
+    ax.set_xlim(0, 1.1)
+    ax.set_xlabel('Puntuación')
+    ax.set_title('Puntuación por Tipo de Arquitectura')
+    plt.tight_layout()
+    
+    # Mostrar gráfico en Streamlit
+    st.pyplot(fig)
+    
     # Interpretación preliminar
-    st.subheader("Interpretación Preliminar")
+    st.subheader("Recomendación de Arquitectura")
     
-    if promedios[0] > 0.67:  # Microservicios
-        interpretacion = "Basado en tus respuestas, tu sistema podría beneficiarse de una **arquitectura de microservicios**."
-    elif promedios[2] > 0.67:  # Orientado a eventos
-        interpretacion = "Basado en tus respuestas, tu sistema podría beneficiarse de una **arquitectura orientada a eventos**."
-    elif all(p < 0.33 for p in promedios):  # Monolítico
-        interpretacion = "Basado en tus respuestas, una **arquitectura monolítica** podría ser más adecuada para tu sistema."
-    else:
-        interpretacion = "Basado en tus respuestas, podrías considerar una **arquitectura híbrida** que combine diferentes enfoques."
+    # Mostrar la recomendación
+    recomendacion = resultados["recomendacion"]
+    st.markdown(f"### {recomendacion['descripcion']}")
+    st.markdown(f"**Puntuación**: {recomendacion['puntuacion']:.2f}")
+    st.markdown(f"_{recomendacion['mensaje']}_")
     
-    st.write(interpretacion)
+    # Si hay arquitecturas con puntuaciones cercanas, mencionarlas
+    if recomendacion['cercanas']:
+        st.info(f"También podrías considerar: {', '.join([arq.capitalize() for arq in recomendacion['cercanas']])}")
+    
+    # Interpretación textual (como estaba en el estado de sesión)
+    st.write(st.session_state.interpretacion_preliminar)
     
     # Sección de chat
     st.subheader("Consulta con nuestro Asesor de Arquitectura")
@@ -66,7 +97,7 @@ def app():
     if 'messages' not in st.session_state:
         # Mensaje inicial basado en la interpretación
         st.session_state.messages = [
-            {"role": "assistant", "content": f"{interpretacion} ¿Tienes alguna pregunta específica sobre esta recomendación o quieres más detalles sobre cómo implementar esta arquitectura?"}
+            {"role": "assistant", "content": f"{st.session_state.interpretacion_preliminar} ¿Tienes alguna pregunta específica sobre esta recomendación o quieres más detalles sobre cómo implementar esta arquitectura?"}
         ]
     
     # Mostrar mensajes previos
@@ -87,7 +118,7 @@ def app():
         # Preparar contexto para la API de OpenAI
         context = {
             "resultados_encuesta": resultados,
-            "interpretacion_preliminar": interpretacion,
+            "interpretacion_preliminar": st.session_state.interpretacion_preliminar,
             "historial_chat": st.session_state.messages[:-1]  # Todo el historial excepto el último mensaje
         }
         
