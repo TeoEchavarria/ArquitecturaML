@@ -157,6 +157,62 @@ def app():
         arq_principal = recomendacion['tipo']
         contexto_principal = cargar_contexto_arquitectura(arq_principal)
         
+        # Estilos CSS para el contenedor con altura limitada
+        css_contenedor_limitado = """
+        <style>
+        .contenedor-limitado {
+            height: 300px;
+            overflow-y: hidden;
+            position: relative;
+            margin-bottom: 10px;
+        }
+        .contenedor-expandido {
+            height: auto;
+            overflow-y: visible;
+        }
+        .gradient-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 50px;
+            background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,1));
+            pointer-events: none;
+        }
+        .expand-button {
+            margin-top: 10px;
+            color: #4169E1;
+            cursor: pointer;
+            display: inline-block;
+            font-weight: bold;
+        }
+        </style>
+        """
+        
+        # Script JavaScript para expandir/contraer el contenido
+        expand_script = """
+        <script>
+        function toggleExpand(containerId) {
+            const container = document.getElementById(containerId);
+            const overlay = document.getElementById(containerId + '-overlay');
+            const button = document.getElementById(containerId + '-button');
+            
+            if (container.classList.contains('contenedor-expandido')) {
+                container.classList.remove('contenedor-expandido');
+                overlay.style.display = 'block';
+                button.innerText = 'Ver más ↓';
+            } else {
+                container.classList.add('contenedor-expandido');
+                overlay.style.display = 'none';
+                button.innerText = 'Ver menos ↑';
+            }
+        }
+        </script>
+        """
+        
+        # ID único para cada contenedor
+        container_id = f"contexto-{arq_principal}"
+        
         # Crear pestañas para cada arquitectura relevante
         if arquitecturas_cercanas_presentes:
             # Si hay arquitecturas cercanas, crear pestañas para todas
@@ -176,7 +232,14 @@ def app():
             # Pestaña para arquitectura principal
             with tabs[0]:
                 if contexto_principal:
-                    st.markdown(contexto_principal)
+                    st.markdown(css_contenedor_limitado, unsafe_allow_html=True)
+                    st.markdown(expand_script, unsafe_allow_html=True)
+                    
+                    # Contenedor con altura limitada
+                    st.markdown(f'<div id="{container_id}" class="contenedor-limitado">{contexto_principal}<div id="{container_id}-overlay" class="gradient-overlay"></div></div>', unsafe_allow_html=True)
+                    
+                    # Botón para expandir/contraer
+                    st.markdown(f'<div class="expand-button" id="{container_id}-button" onclick="toggleExpand(\'{container_id}\')">Ver más ↓</div>', unsafe_allow_html=True)
                 else:
                     st.warning(f"No se encontró información detallada para la arquitectura {arq_principal}.")
             
@@ -184,17 +247,32 @@ def app():
             for i, arq in enumerate(arq_cercanas):
                 with tabs[i+1]:
                     contexto = cargar_contexto_arquitectura(arq)
+                    tab_container_id = f"contexto-{arq}"
+                    
                     if contexto:
-                        st.markdown(contexto)
+                        st.markdown(css_contenedor_limitado, unsafe_allow_html=True)
+                        st.markdown(expand_script, unsafe_allow_html=True)
+                        
+                        # Contenedor con altura limitada
+                        st.markdown(f'<div id="{tab_container_id}" class="contenedor-limitado">{contexto}<div id="{tab_container_id}-overlay" class="gradient-overlay"></div></div>', unsafe_allow_html=True)
+                        
+                        # Botón para expandir/contraer
+                        st.markdown(f'<div class="expand-button" id="{tab_container_id}-button" onclick="toggleExpand(\'{tab_container_id}\')">Ver más ↓</div>', unsafe_allow_html=True)
                     else:
                         st.warning(f"No se encontró información detallada para la arquitectura {arq}.")
         else:
-            # Si solo hay una arquitectura recomendada, mostrar su contexto en un expander
-            with st.expander("Ver información detallada sobre la arquitectura recomendada", expanded=True):
-                if contexto_principal:
-                    st.markdown(contexto_principal)
-                else:
-                    st.warning(f"No se encontró información detallada para la arquitectura {arq_principal}.")
+            # Si solo hay una arquitectura recomendada, mostrar su contexto directo con altura limitada
+            if contexto_principal:
+                st.markdown(css_contenedor_limitado, unsafe_allow_html=True)
+                st.markdown(expand_script, unsafe_allow_html=True)
+                
+                # Contenedor con altura limitada
+                st.markdown(f'<div id="{container_id}" class="contenedor-limitado">{contexto_principal}<div id="{container_id}-overlay" class="gradient-overlay"></div></div>', unsafe_allow_html=True)
+                
+                # Botón para expandir/contraer
+                st.markdown(f'<div class="expand-button" id="{container_id}-button" onclick="toggleExpand(\'{container_id}\')">Ver más ↓</div>', unsafe_allow_html=True)
+            else:
+                st.warning(f"No se encontró información detallada para la arquitectura {arq_principal}.")
     
     # Sección de chat
     st.subheader("Consulta con nuestro Asesor de Arquitectura")
