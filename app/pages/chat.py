@@ -84,7 +84,9 @@ def app():
     st.markdown(f"_{recomendacion['mensaje']}_")
     
     # Si hay arquitecturas con puntuaciones cercanas, mencionarlas
+    tiene_arquitecturas_cercanas = False
     if recomendacion['cercanas']:
+        tiene_arquitecturas_cercanas = True
         st.info(f"También podrías considerar: {', '.join([arq.capitalize() for arq in recomendacion['cercanas']])}")
     
     # Interpretación textual (como estaba en el estado de sesión)
@@ -96,8 +98,12 @@ def app():
     # Inicializar historial de chat si no existe
     if 'messages' not in st.session_state:
         # Mensaje inicial basado en la interpretación
+        mensaje_inicial = st.session_state.interpretacion_preliminar
+        if tiene_arquitecturas_cercanas:
+            mensaje_inicial += f"\n\nLas arquitecturas {recomendacion['tipo']} y {', '.join(recomendacion['cercanas'])} tienen puntuaciones muy cercanas, lo que indica que podrías beneficiarte de un enfoque híbrido que combine sus características."
+        
         st.session_state.messages = [
-            {"role": "assistant", "content": f"{st.session_state.interpretacion_preliminar} ¿Tienes alguna pregunta específica sobre esta recomendación o quieres más detalles sobre cómo implementar esta arquitectura?"}
+            {"role": "assistant", "content": f"{mensaje_inicial} ¿Tienes alguna pregunta específica sobre esta recomendación o quieres más detalles sobre cómo implementar esta arquitectura?"}
         ]
     
     # Mostrar mensajes previos
@@ -115,12 +121,34 @@ def app():
         with st.chat_message("user", avatar="🧑‍💻"):
             st.write(prompt)
         
-        # Preparar contexto para la API de OpenAI
+        # Preparar contexto básico para la API de OpenAI
         context = {
             "resultados_encuesta": resultados,
             "interpretacion_preliminar": st.session_state.interpretacion_preliminar,
             "historial_chat": st.session_state.messages[:-1]  # Todo el historial excepto el último mensaje
         }
+        
+        # Si hay arquitecturas con puntuaciones cercanas, agregar contexto adicional
+        if tiene_arquitecturas_cercanas:
+            # Determinar qué arquitecturas tienen puntuaciones cercanas
+            arq_principal = recomendacion['tipo']
+            arq_cercanas = recomendacion['cercanas']
+            
+            # Preparar contexto expandido con información sobre las arquitecturas cercanas
+            context["tiene_arquitecturas_cercanas"] = True
+            context["arquitectura_principal"] = arq_principal
+            context["arquitecturas_cercanas"] = arq_cercanas
+            
+            # Añadir guía específica para el chatbot sobre cómo abordar un escenario híbrido
+            context["guia_hibrida"] = """
+            Este caso presenta varias arquitecturas con puntuaciones muy cercanas. 
+            Al responder, considera las ventajas de cada enfoque y cómo podrían combinarse.
+            Explora patrones de integración específicos que permitan aprovechar lo mejor de cada arquitectura.
+            Sugiere estrategias para una implementación incremental que permita evolucionar desde una arquitectura a otra.
+            Explica los compromisos y desafíos al combinar diferentes enfoques arquitectónicos.
+            """
+        else:
+            context["tiene_arquitecturas_cercanas"] = False
         
         # Obtener respuesta del modelo
         response = get_openai_response(prompt, context)

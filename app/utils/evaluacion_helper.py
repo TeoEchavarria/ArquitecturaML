@@ -3,8 +3,8 @@ Utilidades para evaluar resultados de la encuesta de arquitectura.
 Este módulo se encarga de calcular los puntajes y determinar la arquitectura más adecuada.
 """
 import numpy as np
-from app.context.arquitectura_data import PREGUNTAS_ARQUITECTURA, INTERPRETACION_DIFUSA
-from app.config import UMBRAL_BAJO, UMBRAL_MEDIO, UMBRAL_ALTO, PESOS_CATEGORIAS, FRASES_INTERPRETACION
+from context.arquitectura_data import PREGUNTAS_ARQUITECTURA, INTERPRETACION_DIFUSA
+from config import UMBRAL_BAJO, UMBRAL_MEDIO, UMBRAL_ALTO, PESOS_CATEGORIAS, FRASES_INTERPRETACION
 
 def procesar_respuestas(respuestas):
     """

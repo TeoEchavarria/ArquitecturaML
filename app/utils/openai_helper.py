@@ -50,17 +50,79 @@ def get_openai_response(user_message, context=None):
         
         # Agregar contexto si está disponible
         if context:
+            # Verificar si hay arquitecturas con puntuaciones cercanas
+            if context.get("tiene_arquitecturas_cercanas", False):
+                arq_principal = context.get("arquitectura_principal", "")
+                arq_cercanas = context.get("arquitecturas_cercanas", [])
+                
+                # Agregar instrucciones específicas para el caso de arquitecturas cercanas
+                hybrid_prompt = f"""
+                IMPORTANTE: En este caso, el usuario tiene varias arquitecturas con puntuaciones muy cercanas:
+                - Arquitectura principal: {arq_principal}
+                - Arquitecturas cercanas: {', '.join(arq_cercanas)}
+                
+                {context.get('guia_hibrida', '')}
+                
+                Cuando respondas, considera estos aspectos híbridos y profundiza en:
+                1. Cómo pueden combinarse efectivamente estas arquitecturas
+                2. Qué elementos de cada una deberían priorizarse
+                3. Estrategias de implementación incremental
+                4. Patrones arquitectónicos que faciliten la integración
+                5. Ejemplos concretos de sistemas que utilizan enfoques híbridos similares
+                
+                Sé específico con ejemplos y recomendaciones concretas, no solo teóricas.
+                """
+                
+                messages.append({"role": "system", "content": hybrid_prompt})
+            
             # Agregar resultados de la encuesta como contexto
             if "resultados_encuesta" in context:
                 resultados = context["resultados_encuesta"]
-                resultados_texto = json.dumps(resultados, indent=2, ensure_ascii=False)
+                # Convertir solo lo necesario a texto para evitar mensajes demasiado largos
+                puntuaciones_globales = resultados.get("puntuaciones_globales", {})
+                recomendacion = resultados.get("recomendacion", {})
+                
+                categorias = [cat for cat in resultados.keys() if cat not in ["puntuaciones_globales", "recomendacion"]]
+                promedios_categorias = {cat: resultados[cat].get("promedio", 0) for cat in categorias}
+                
+                # Crear un resumen más compacto de los resultados
+                resultados_resumidos = {
+                    "puntuaciones_globales": puntuaciones_globales,
+                    "recomendacion": recomendacion,
+                    "promedios_categorias": promedios_categorias
+                }
+                
+                resultados_texto = json.dumps(resultados_resumidos, indent=2, ensure_ascii=False)
                 context_message = f"""
-                Información de la encuesta del usuario:
+                Información resumida de la encuesta del usuario:
                 {resultados_texto}
                 
                 Interpretación preliminar: {context.get('interpretacion_preliminar', 'No disponible')}
                 """
                 messages.append({"role": "system", "content": context_message})
+            
+            # Cargar contextos específicos por tipo de arquitectura
+            if "resultados_encuesta" in context and "recomendacion" in context["resultados_encuesta"]:
+                recomendacion = context["resultados_encuesta"]["recomendacion"]
+                tipo_recomendacion = recomendacion.get("tipo", "")
+                
+                # Si hay arquitecturas cercanas, cargar contextos específicos para todas ellas
+                if context.get("tiene_arquitecturas_cercanas", False):
+                    # Cargar contexto de la arquitectura principal
+                    contexto_principal = cargar_contexto_arquitectura(tipo_recomendacion)
+                    if contexto_principal:
+                        messages.append({"role": "system", "content": contexto_principal})
+                    
+                    # Cargar contexto de las arquitecturas cercanas
+                    for arq_cercana in context.get("arquitecturas_cercanas", []):
+                        contexto_cercana = cargar_contexto_arquitectura(arq_cercana)
+                        if contexto_cercana:
+                            messages.append({"role": "system", "content": contexto_cercana})
+                else:
+                    # Solo cargar el contexto de la arquitectura recomendada
+                    contexto_arquitectura = cargar_contexto_arquitectura(tipo_recomendacion)
+                    if contexto_arquitectura:
+                        messages.append({"role": "system", "content": contexto_arquitectura})
             
             # Agregar historial de chat si está disponible
             if "historial_chat" in context:
@@ -72,7 +134,7 @@ def get_openai_response(user_message, context=None):
         
         # Obtener respuesta de OpenAI
         response = openai.ChatCompletion.create(
-            model="gpt-4",  # Puedes usar 'gpt-3.5-turbo' como alternativa
+            model=os.getenv("OPENAI_MODEL"),
             messages=messages,
             temperature=0.7,
             max_tokens=1000
@@ -84,7 +146,52 @@ def get_openai_response(user_message, context=None):
         print(f"Error al comunicarse con OpenAI: {e}")
         return f"Lo siento, ha ocurrido un error al procesar tu solicitud. Detalles: {str(e)}"
 
-# Función de prueba
-if __name__ == "__main__":
-    test_message = "¿Qué ventajas tiene una arquitectura de microservicios?"
-    print(get_openai_response(test_message))
+def cargar_contexto_arquitectura(tipo_arquitectura):
+    """
+    Carga el contexto específico para un tipo de arquitectura desde un archivo JSON.
+    
+    Args:
+        tipo_arquitectura (str): Tipo de arquitectura (microservicios, eventos, monolitico, hibrido)
+        
+    Returns:
+        str: Contenido del contexto o None si no se encuentra
+    """
+    try:
+        # Mapear el tipo de arquitectura al nombre del archivo
+        archivos_contexto = {
+            "microservicios": "contexto_microservicios.json",
+            "eventos": "contexto_eventos.json",
+            "monolitico": "contexto_monolitico.json",
+            "hibrido": "contexto_hibrido.json"
+        }
+        
+        archivo = archivos_contexto.get(tipo_arquitectura)
+        if not archivo:
+            return None
+        
+        # Construir ruta al archivo de contexto (dentro de la carpeta data)
+        ruta_archivo = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+            "data",
+            archivo
+        )
+        
+        # Verificar si el archivo existe
+        if not os.path.exists(ruta_archivo):
+            print(f"Archivo de contexto {ruta_archivo} no encontrado")
+            return None
+        
+        # Cargar el contenido del archivo
+        with open(ruta_archivo, 'r', encoding='utf-8') as f:
+            datos = json.load(f)
+            
+        # El archivo debe contener un campo 'contexto' con el texto
+        if 'contexto' in datos:
+            return datos['contexto']
+        else:
+            print(f"El archivo {archivo} no contiene un campo 'contexto'")
+            return None
+            
+    except Exception as e:
+        print(f"Error al cargar el contexto de arquitectura: {e}")
+        return None
