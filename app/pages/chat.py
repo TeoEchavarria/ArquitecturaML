@@ -1,9 +1,10 @@
 import streamlit as st
 import json
 import os
-from utils.openai_helper import get_openai_response
+from utils.openai_helper import get_openai_response, cargar_contexto_arquitectura
 import matplotlib.pyplot as plt
 import numpy as np
+import matplotlib as mpl
 
 def app():
     st.title("Chat de Asesoría Arquitectónica")
@@ -47,32 +48,8 @@ def app():
             delta=f"{'+' if promedios[2] > 0.5 else ''}{(promedios[2] - 0.5):.2f}"
         )
     
-    # Mostrar puntuaciones globales en una gráfica
-    st.subheader("Puntuaciones por Arquitectura")
-    
-    # Extraer puntuaciones para cada arquitectura
-    puntuaciones = resultados["puntuaciones_globales"]
-    arquitecturas = list(puntuaciones.keys())
-    valores = list(puntuaciones.values())
-    
-    # Crear gráfico de barras horizontal
-    fig, ax = plt.subplots(figsize=(10, 5))
-    bars = ax.barh(arquitecturas, valores, color=['#3498db', '#2ecc71', '#e74c3c', '#f39c12'])
-    
-    # Añadir etiquetas a las barras
-    for i, bar in enumerate(bars):
-        width = bar.get_width()
-        ax.text(width + 0.01, bar.get_y() + bar.get_height()/2, 
-                f'{width:.2f}', ha='left', va='center')
-    
-    # Configuración del gráfico
-    ax.set_xlim(0, 1.1)
-    ax.set_xlabel('Puntuación')
-    ax.set_title('Puntuación por Tipo de Arquitectura')
-    plt.tight_layout()
-    
-    # Mostrar gráfico en Streamlit
-    st.pyplot(fig)
+    # Mostrar puntuaciones globales en un gráfico de radar
+    st.subheader("Valoración Estilo Arquitectónico")
     
     # Interpretación preliminar
     st.subheader("Recomendación de Arquitectura")
@@ -84,13 +61,140 @@ def app():
     st.markdown(f"_{recomendacion['mensaje']}_")
     
     # Si hay arquitecturas con puntuaciones cercanas, mencionarlas
-    tiene_arquitecturas_cercanas = False
+    arquitecturas_cercanas_presentes = False
     if recomendacion['cercanas']:
-        tiene_arquitecturas_cercanas = True
+        arquitecturas_cercanas_presentes = True
         st.info(f"También podrías considerar: {', '.join([arq.capitalize() for arq in recomendacion['cercanas']])}")
     
     # Interpretación textual (como estaba en el estado de sesión)
     st.write(st.session_state.interpretacion_preliminar)
+    
+    # Crear layout de dos columnas para el gráfico y el contexto
+    col_grafico, col_contexto = st.columns([1, 1])
+    
+    with col_grafico:
+        # Extraer puntuaciones para cada arquitectura
+        puntuaciones = resultados["puntuaciones_globales"]
+        
+        # Crear nombres más claros para la visualización
+        nombres_arquitecturas = {
+            "microservicios": "Microservicios",
+            "eventos": "Eventos",
+            "monolitico": "Monolítica",
+            "hibrido": "SOA"  # Cambiamos híbrido por SOA para adaptar a la imagen
+        }
+        
+        # Preparar datos para el gráfico radar
+        arquitecturas = [nombres_arquitecturas.get(arq, arq) for arq in puntuaciones.keys()]
+        valores = [puntuaciones[arq] for arq in puntuaciones.keys()]
+        
+        # Crear valores ideales (1.0) para cada arquitectura
+        valores_ideales = [1.0] * len(arquitecturas)
+        
+        # Crear valores mínimos (0.33) para cada arquitectura
+        valores_minimos = [0.33] * len(arquitecturas)
+        
+        # Configurar el gráfico de radar
+        fig = plt.figure(figsize=(6, 5))  # Tamaño reducido
+        ax = fig.add_subplot(111, polar=True)
+        
+        # Configurar el estilo del gráfico
+        plt.style.use('default')
+        
+        # Número de variables
+        N = len(arquitecturas)
+        
+        # Calcular ángulos para cada eje (en radianes)
+        angulos = [n / float(N) * 2 * np.pi for n in range(N)]
+        
+        # Cerrar el polígono repitiendo el primer ángulo
+        angulos += angulos[:1]
+        
+        # Ajustar valores para cerrar el polígono
+        valores += valores[:1]
+        valores_ideales += valores_ideales[:1]
+        valores_minimos += valores_minimos[:1]
+        
+        # Añadir los ejes
+        plt.xticks(angulos[:-1], arquitecturas, size=10)  # Tamaño de texto reducido
+        
+        # Dibujar límites del gráfico
+        ax.set_rlabel_position(0)
+        plt.yticks([0.2, 0.4, 0.6, 0.8, 1.0], ["20%", "40%", "60%", "80%", "100%"], color="grey", size=8)  # Tamaño de texto reducido
+        plt.ylim(0, 1)
+        
+        # Dibujar cada línea y rellenar área
+        ax.plot(angulos, valores_ideales, linewidth=1, linestyle='dashed', color='blue', label='Ideal', alpha=0.9)
+        ax.plot(angulos, valores, linewidth=2, linestyle='solid', color='green', label='Real', alpha=0.9)
+        ax.plot(angulos, valores_minimos, linewidth=1, linestyle='dotted', color='red', label='Mínimo', alpha=0.9)
+        
+        # Rellenar áreas
+        ax.fill(angulos, valores, color='green', alpha=0.2)
+        
+        # Añadir valores numéricos a los puntos del polígono real
+        for i, valor in enumerate(valores[:-1]):  # Excluir el último que es repetido
+            porcentaje = int(valor * 100)
+            ax.annotate(f"{porcentaje}%", 
+                       xy=(angulos[i], valor),
+                       xytext=(angulos[i], valor + 0.05),
+                       ha='center',
+                       va='bottom',
+                       bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.7),
+                       fontsize=8)  # Tamaño de texto reducido
+        
+        # Añadir título y leyenda
+        plt.title('VALORACIÓN ESTILO ARQUITECTÓNICO', size=12, y=1.1)  # Tamaño del título reducido
+        plt.legend(loc='upper right', bbox_to_anchor=(0.1, 0.1), fontsize=8)  # Tamaño de leyenda reducido
+        
+        # Mostrar gráfico en Streamlit
+        st.pyplot(fig)
+
+    with col_contexto:
+        # Sección para mostrar el contexto de la arquitectura
+        st.subheader("Información de referencia")
+        
+        # Obtener el contexto de la arquitectura recomendada
+        arq_principal = recomendacion['tipo']
+        contexto_principal = cargar_contexto_arquitectura(arq_principal)
+        
+        # Crear pestañas para cada arquitectura relevante
+        if arquitecturas_cercanas_presentes:
+            # Si hay arquitecturas cercanas, crear pestañas para todas
+            arq_cercanas = recomendacion['cercanas']
+            
+            # Crear nombre de pestañas
+            nombres_arquitecturas = {
+                "microservicios": "Microservicios",
+                "eventos": "Arq. Eventos",
+                "monolitico": "Monolítico",
+                "hibrido": "Híbrido"
+            }
+            
+            tabs = st.tabs([nombres_arquitecturas.get(arq_principal, "Principal")] + 
+                        [nombres_arquitecturas.get(arq, arq.capitalize()) for arq in arq_cercanas])
+            
+            # Pestaña para arquitectura principal
+            with tabs[0]:
+                if contexto_principal:
+                    st.markdown(contexto_principal)
+                else:
+                    st.warning(f"No se encontró información detallada para la arquitectura {arq_principal}.")
+            
+            # Pestañas para arquitecturas cercanas
+            for i, arq in enumerate(arq_cercanas):
+                with tabs[i+1]:
+                    contexto = cargar_contexto_arquitectura(arq)
+                    if contexto:
+                        st.markdown(contexto)
+                    else:
+                        st.warning(f"No se encontró información detallada para la arquitectura {arq}.")
+        else:
+            # Si solo hay una arquitectura recomendada, mostrar su contexto en un expander
+            with st.expander("Ver información detallada sobre la arquitectura recomendada", expanded=True):
+                if contexto_principal:
+                    st.markdown(contexto_principal)
+                else:
+                    st.warning(f"No se encontró información detallada para la arquitectura {arq_principal}.")
     
     # Sección de chat
     st.subheader("Consulta con nuestro Asesor de Arquitectura")
@@ -99,7 +203,7 @@ def app():
     if 'messages' not in st.session_state:
         # Mensaje inicial basado en la interpretación
         mensaje_inicial = st.session_state.interpretacion_preliminar
-        if tiene_arquitecturas_cercanas:
+        if arquitecturas_cercanas_presentes:
             mensaje_inicial += f"\n\nLas arquitecturas {recomendacion['tipo']} y {', '.join(recomendacion['cercanas'])} tienen puntuaciones muy cercanas, lo que indica que podrías beneficiarte de un enfoque híbrido que combine sus características."
         
         st.session_state.messages = [
@@ -129,7 +233,7 @@ def app():
         }
         
         # Si hay arquitecturas con puntuaciones cercanas, agregar contexto adicional
-        if tiene_arquitecturas_cercanas:
+        if arquitecturas_cercanas_presentes:
             # Determinar qué arquitecturas tienen puntuaciones cercanas
             arq_principal = recomendacion['tipo']
             arq_cercanas = recomendacion['cercanas']
