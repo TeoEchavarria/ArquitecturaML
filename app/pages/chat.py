@@ -157,61 +157,37 @@ def app():
         arq_principal = recomendacion['tipo']
         contexto_principal = cargar_contexto_arquitectura(arq_principal)
         
-        # Estilos CSS para el contenedor con altura limitada
-        css_contenedor_limitado = """
+        # Estilos CSS para contenedor scrolleable
+        css_contenedor_scroll = """
         <style>
-        .contenedor-limitado {
+        .contenedor-scroll {
             height: 300px;
-            overflow-y: hidden;
-            position: relative;
-            margin-bottom: 10px;
+            overflow-y: auto;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #f8f9fa;
+            border: 1px solid #eaecef;
+            margin-bottom: 15px;
         }
-        .contenedor-expandido {
-            height: auto;
-            overflow-y: visible;
+        .contenedor-scroll::-webkit-scrollbar {
+            width: 8px;
         }
-        .gradient-overlay {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            height: 50px;
-            background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,1));
-            pointer-events: none;
+        .contenedor-scroll::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
         }
-        .expand-button {
-            margin-top: 10px;
-            color: #4169E1;
-            cursor: pointer;
-            display: inline-block;
-            font-weight: bold;
+        .contenedor-scroll::-webkit-scrollbar-thumb {
+            background: #b9b9b9;
+            border-radius: 10px;
+        }
+        .contenedor-scroll::-webkit-scrollbar-thumb:hover {
+            background: #888;
         }
         </style>
         """
         
-        # Script JavaScript para expandir/contraer el contenido
-        expand_script = """
-        <script>
-        function toggleExpand(containerId) {
-            const container = document.getElementById(containerId);
-            const overlay = document.getElementById(containerId + '-overlay');
-            const button = document.getElementById(containerId + '-button');
-            
-            if (container.classList.contains('contenedor-expandido')) {
-                container.classList.remove('contenedor-expandido');
-                overlay.style.display = 'block';
-                button.innerText = 'Ver más ↓';
-            } else {
-                container.classList.add('contenedor-expandido');
-                overlay.style.display = 'none';
-                button.innerText = 'Ver menos ↑';
-            }
-        }
-        </script>
-        """
-        
-        # ID único para cada contenedor
-        container_id = f"contexto-{arq_principal}"
+        # Aplicar CSS una vez
+        st.markdown(css_contenedor_scroll, unsafe_allow_html=True)
         
         # Crear pestañas para cada arquitectura relevante
         if arquitecturas_cercanas_presentes:
@@ -232,14 +208,8 @@ def app():
             # Pestaña para arquitectura principal
             with tabs[0]:
                 if contexto_principal:
-                    st.markdown(css_contenedor_limitado, unsafe_allow_html=True)
-                    st.markdown(expand_script, unsafe_allow_html=True)
-                    
-                    # Contenedor con altura limitada
-                    st.markdown(f'<div id="{container_id}" class="contenedor-limitado">{contexto_principal}<div id="{container_id}-overlay" class="gradient-overlay"></div></div>', unsafe_allow_html=True)
-                    
-                    # Botón para expandir/contraer
-                    st.markdown(f'<div class="expand-button" id="{container_id}-button" onclick="toggleExpand(\'{container_id}\')">Ver más ↓</div>', unsafe_allow_html=True)
+                    # Contenedor scrolleable
+                    st.markdown(f'<div class="contenedor-scroll">{contexto_principal}</div>', unsafe_allow_html=True)
                 else:
                     st.warning(f"No se encontró información detallada para la arquitectura {arq_principal}.")
             
@@ -247,30 +217,16 @@ def app():
             for i, arq in enumerate(arq_cercanas):
                 with tabs[i+1]:
                     contexto = cargar_contexto_arquitectura(arq)
-                    tab_container_id = f"contexto-{arq}"
-                    
                     if contexto:
-                        st.markdown(css_contenedor_limitado, unsafe_allow_html=True)
-                        st.markdown(expand_script, unsafe_allow_html=True)
-                        
-                        # Contenedor con altura limitada
-                        st.markdown(f'<div id="{tab_container_id}" class="contenedor-limitado">{contexto}<div id="{tab_container_id}-overlay" class="gradient-overlay"></div></div>', unsafe_allow_html=True)
-                        
-                        # Botón para expandir/contraer
-                        st.markdown(f'<div class="expand-button" id="{tab_container_id}-button" onclick="toggleExpand(\'{tab_container_id}\')">Ver más ↓</div>', unsafe_allow_html=True)
+                        # Contenedor scrolleable
+                        st.markdown(f'<div class="contenedor-scroll">{contexto}</div>', unsafe_allow_html=True)
                     else:
                         st.warning(f"No se encontró información detallada para la arquitectura {arq}.")
         else:
-            # Si solo hay una arquitectura recomendada, mostrar su contexto directo con altura limitada
+            # Si solo hay una arquitectura recomendada, mostrar su contexto directo
             if contexto_principal:
-                st.markdown(css_contenedor_limitado, unsafe_allow_html=True)
-                st.markdown(expand_script, unsafe_allow_html=True)
-                
-                # Contenedor con altura limitada
-                st.markdown(f'<div id="{container_id}" class="contenedor-limitado">{contexto_principal}<div id="{container_id}-overlay" class="gradient-overlay"></div></div>', unsafe_allow_html=True)
-                
-                # Botón para expandir/contraer
-                st.markdown(f'<div class="expand-button" id="{container_id}-button" onclick="toggleExpand(\'{container_id}\')">Ver más ↓</div>', unsafe_allow_html=True)
+                # Contenedor scrolleable
+                st.markdown(f'<div class="contenedor-scroll">{contexto_principal}</div>', unsafe_allow_html=True)
             else:
                 st.warning(f"No se encontró información detallada para la arquitectura {arq_principal}.")
     
