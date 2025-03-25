@@ -1,7 +1,7 @@
 FROM python:3.12-slim
 
 # Update package list and install necessary system packages
-RUN pip install --upgrade pip setuptools
+RUN pip install --upgrade pip setuptools==68.2.0
 
 # Copy your requirements file and set working directory
 COPY requirements.txt /app/requirements.txt
