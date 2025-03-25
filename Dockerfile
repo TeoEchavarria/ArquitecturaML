@@ -1,9 +1,9 @@
 FROM python:3.12-slim
 
 # Update package list and install necessary system packages
-RUN apt-get update && apt-get install -y \
-    libstdc++6 \
-    python3-distutils
+# RUN apt-get update && apt-get install -y \
+#     libstdc++6 \
+#     python3-distutils
 
 # Optionally, you might also need build-essential for compiling packages
 # RUN apt-get install -y build-essential
