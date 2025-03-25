@@ -1,12 +1,18 @@
-# Use an official Python image that includes the needed libraries
 FROM python:3.12-slim
 
-# Install libstdc++6 (and other necessary system packages)
-RUN apt-get update && apt-get install -y libstdc++6
+# Update package list and install necessary system packages
+RUN apt-get update && apt-get install -y \
+    libstdc++6 \
+    python3-distutils
 
-# Copy your requirements file and install Python dependencies
+# Optionally, you might also need build-essential for compiling packages
+# RUN apt-get install -y build-essential
+
+# Copy your requirements file and set working directory
 COPY requirements.txt /app/requirements.txt
 WORKDIR /app
+
+# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy your application code into the container
